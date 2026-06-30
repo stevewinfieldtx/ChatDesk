@@ -47,3 +47,4 @@ Drop a `tenants/<id>.json` (copy `rainnetworks.json`), set branding/hours/zoom/A
 ## Rain Networks embed
 
 Add the one-line snippet to the bottom of `ws-Rain-Networks-v2/index.html` (and it propagates as you wish). Because the CMS strips `<script>` on ingest, keep this on the statically served site; re-add after any CMS round-trip.
+# ChatDesk
