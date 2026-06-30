@@ -7,6 +7,7 @@
     "headerTitle": "Rain Networks",
     "greeting": "Hi! Ask us anything about cybersecurity distribution, partner pricing, or becoming a reseller. A specialist will jump in, or our assistant can help right away."
   },
+  "voiceAgentId": "agent_4401ktkp8epfe579fqhxn6rkg68n",
   "humanWaitSeconds": 45,
   "hours": {
     "tz": "America/Los_Angeles",

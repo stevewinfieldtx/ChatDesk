@@ -77,7 +77,7 @@ async function aiRespond(tenant, c) {
 app.get('/api/:tenant/config', (req, res) => {
   const t = tenants.get(req.params.tenant);
   if (!t) return res.status(404).json({ error: 'unknown tenant' });
-  res.json({ id: t.id, name: t.name, brand: t.brand || {} });
+  res.json({ id: t.id, name: t.name, brand: t.brand || {}, voiceAgentId: t.voiceAgentId || '' });
 });
 
 // ---- visitor sends a message ----
