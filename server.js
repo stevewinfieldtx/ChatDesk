@@ -5,8 +5,9 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { withinBusinessHours } from './lib/hours.js';
 import { generateReply } from './lib/ai.js';
-import { postToZoom, postCoachingToZoom, verifyZoomEvent } from './lib/zoom.js';
+import { postToZoom, postCoachingToZoom, verifyZoomEvent, parseRepEvent, sessionFromText } from './lib/zoom.js';
 import { generateCoaching } from './lib/coach.js';
+import { createHmac } from 'node:crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -44,12 +45,25 @@ function push(c, from, text, meta = {}) {
   c.messages.push({ from, text, ts: Date.now(), ...meta });
 }
 
+// Zoom thread mapping for two-way replies (chatbot mode).
+const zoomThreads = new Map(); // posted root message_id -> { tenantId, sessionId }
+const ourPosts = new Set();    // message_ids WE posted (loop guard: ignore them as "rep replies")
+
+// Post a customer turn into Zoom and remember the thread root + our own message ids.
+function notifyZoom(t, c, text) {
+  postToZoom(t, { sessionId: c.sessionId, text, visitor: c.visitor }).then(r => {
+    if (!r || !r.messageId) return;
+    ourPosts.add(r.messageId);
+    if (!c.zoomRoot) { c.zoomRoot = r.messageId; zoomThreads.set(r.messageId, { tenantId: t.id, sessionId: c.sessionId }); }
+  }).catch(() => {});
+}
+
 // Fire-and-forget rep co-pilot: refresh coaching for the rep after a customer turn.
 function runCoaching(tenant, c) {
   generateCoaching(tenant, c.messages).then(co => {
     if (!co) return;
     c.coaching = co;
-    postCoachingToZoom(tenant, c.sessionId, co); // surface coaching in the rep's Zoom channel
+    postCoachingToZoom(tenant, c.sessionId, co).then(r => { if (r && r.messageId) ourPosts.add(r.messageId); });
   }).catch(() => {});
 }
 
@@ -79,7 +93,7 @@ app.post('/api/:tenant/send', async (req, res) => {
 
   if (c.humanJoined) {
     // A rep is handling it; mirror the new message into Zoom so they see it.
-    postToZoom(t, { sessionId, text, visitor: c.visitor });
+    notifyZoom(t, c, text);
     runCoaching(t, c); // co-pilot: coach the rep on this turn
     return res.json({ ok: true, status: 'human' });
   }
@@ -92,7 +106,7 @@ app.post('/api/:tenant/send', async (req, res) => {
   }
 
   // In hours: notify the team's Zoom channel and start the human-wait timer once.
-  postToZoom(t, { sessionId, text, visitor: c.visitor });
+  notifyZoom(t, c, text);
   runCoaching(t, c); // co-pilot ready for whichever rep picks this up
   if (!c.aiTimer && c.status !== 'ai') {
     c.status = 'waiting';
@@ -165,17 +179,29 @@ app.get('/api/:tenant/coach', (req, res) => {
 
 // ---- Zoom event webhook (bidirectional: rep reply in channel -> widget) ----
 app.post('/api/zoom/events', (req, res) => {
-  // Zoom URL validation handshake.
-  if (req.body?.event === 'endpoint.url_validation') {
-    const token = req.body.payload?.plainToken || '';
-    return res.json({ plainToken: token, encryptedToken: token });
+  console.log('[zoom event]', JSON.stringify(req.body || {}).slice(0, 1000)); // inspect real shapes during setup
+  const ev = parseRepEvent(req.body);
+  // Zoom URL validation handshake (HMAC of plainToken with the app secret).
+  if (ev?.kind === 'validation') {
+    const secret = process.env.ZOOM_WEBHOOK_SECRET;
+    const enc = secret ? createHmac('sha256', secret).update(ev.plainToken).digest('hex') : ev.plainToken;
+    return res.json({ plainToken: ev.plainToken, encryptedToken: enc });
   }
   if (!verifyZoomEvent(req)) return res.sendStatus(401);
-  // A rep replied in the channel. Expected to reference the session code [sessionId]
-  // and identify the tenant + reply text. Mapping is wired when the Zoom app is published.
-  const { tenant: tenantId, sessionId, text, rep } = req.body?.payload || {};
-  const t = tenants.get(tenantId);
-  if (t && sessionId && text) repReply(t, sessionId, text, rep);
+  if (!ev || ev.kind !== 'reply') return res.sendStatus(200);
+  if (ev.msgId && ourPosts.has(ev.msgId)) return res.sendStatus(200); // ignore the bot's own posts
+
+  // Map the rep's reply to a session: prefer the thread parent, fall back to the [session] tag.
+  let target = ev.replyTo ? zoomThreads.get(ev.replyTo) : null;
+  let text = ev.text;
+  if (!target) {
+    const code = sessionFromText(ev.text);
+    if (code) {
+      for (const c of convos.values()) { if (c.sessionId === code) { target = { tenantId: c.tenantId, sessionId: code }; break; } }
+      text = ev.text.replace(/\s*\[[A-Za-z0-9_]{4,}\]\s*/, ' ').trim(); // strip the tag from what the customer sees
+    }
+  }
+  if (target) { const t = tenants.get(target.tenantId); if (t) repReply(t, target.sessionId, text, ev.rep); }
   res.sendStatus(200);
 });
 
