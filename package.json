@@ -1,0 +1,14 @@
+{
+  "name": "ws-chatdesk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Multi-tenant live chat widget that routes to a team's Zoom channel, with a 45s AI fallback and after-hours AI. Tenant 1: Rain Networks.",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

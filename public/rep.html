@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ChatDesk rep console (test)</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,sans-serif;margin:0;background:#f4f6fa;color:#16202b}
+    .wrap{max-width:720px;margin:0 auto;padding:28px 20px}
+    h1{font-size:22px}
+    .row{display:flex;gap:8px;margin-bottom:14px}
+    input{border:1px solid #cfd6e2;border-radius:8px;padding:9px 11px;font-size:14px}
+    button{background:#2563eb;color:#fff;border:0;border-radius:8px;padding:9px 14px;font-weight:600;cursor:pointer}
+    .sess{background:#fff;border:1px solid #e3e8f0;border-radius:12px;padding:14px;margin-bottom:12px}
+    .sess .meta{font-size:12px;color:#6b7c92;margin-bottom:6px}
+    .sess .last{font-size:14px;margin-bottom:10px}
+    .sess .reply{display:flex;gap:8px}.sess .reply input{flex:1}
+    .badge{font-size:11px;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#2563eb;margin-left:6px}
+    .coach{background:#0f1b2e;color:#dbe7f5;border-radius:10px;padding:10px 12px;margin:0 0 10px;font-size:13px;line-height:1.5}
+    .coach .coach-h{font-weight:700;color:#6ea2ff;font-size:12px;letter-spacing:.04em;margin-bottom:4px}
+    .coach .cr{opacity:.92}.coach .cr b{color:#9fb8d6;font-weight:600}
+    .coach .tip{margin-top:6px;color:#bff0d0;font-weight:600}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Rep console <span class="badge" id="t">rainnetworks</span></h1>
+    <div class="row">
+      <input id="tenant" value="rainnetworks" />
+      <input id="secret" placeholder="rep secret" value="changeme" />
+      <button onclick="load()">Load chats</button>
+    </div>
+    <div id="list"></div>
+  </div>
+  <script>
+    function H(){return {'Content-Type':'application/json','X-Rep-Secret':document.getElementById('secret').value};}
+    function T(){return document.getElementById('tenant').value;}
+    function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+    function coachHTML(co){if(!co)return '';return '<div class="coach"><div class="coach-h">CO-PILOT</div><div class="cr"><b>Vertical:</b> '+esc(co.vertical)+' &nbsp; <b>Intent:</b> '+esc(co.intent)+' &nbsp; <b>Tone:</b> '+esc(co.tone)+'</div><div class="cr"><b>Pains:</b> '+(co.pains||[]).map(esc).join(', ')+'</div><div class="tip">&rarr; '+esc(co.tip)+'</div></div>';}
+    async function load(){
+      document.getElementById('t').textContent=T();
+      const r=await fetch('/api/'+T()+'/sessions',{headers:H()});
+      const d=await r.json(); const el=document.getElementById('list');
+      if(d.error){el.innerHTML='<p style="color:#c0392b">'+d.error+'</p>';return;}
+      if(!d.sessions.length){el.innerHTML='<p>No active chats yet. Open the demo page and send a message.</p>';return;}
+      el.innerHTML=d.sessions.map(function(s){return '<div class="sess"><div class="meta">'+s.sessionId+' · '+s.status+(s.humanJoined?' · you joined':'')+'</div><div class="last">Last: '+esc(s.lastMessage||'(none)')+'</div>'+coachHTML(s.coaching)+'<div class="reply"><input id="r_'+s.sessionId+'" placeholder="Reply as specialist…"/><button onclick="reply(\''+s.sessionId+'\')">Send</button></div></div>';}).join('');
+    }
+    async function reply(sid){
+      const v=document.getElementById('r_'+sid).value.trim(); if(!v)return;
+      await fetch('/api/'+T()+'/rep-reply',{method:'POST',headers:H(),body:JSON.stringify({sessionId:sid,text:v,rep:'Specialist'})});
+      document.getElementById('r_'+sid).value=''; load();
+    }
+    load(); setInterval(load, 4000);
+  </script>
+</body>
+</html>

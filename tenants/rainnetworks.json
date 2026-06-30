@@ -1,0 +1,26 @@
+{
+  "id": "rainnetworks",
+  "name": "Rain Networks",
+  "brand": {
+    "accent": "#2563eb",
+    "launcherText": "Chat now",
+    "headerTitle": "Rain Networks",
+    "greeting": "Hi! Ask us anything about cybersecurity distribution, partner pricing, or becoming a reseller. A specialist will jump in, or our assistant can help right away."
+  },
+  "humanWaitSeconds": 45,
+  "hours": {
+    "tz": "America/Los_Angeles",
+    "start": 8,
+    "end": 17,
+    "days": [1, 2, 3, 4, 5]
+  },
+  "zoom": {
+    "mode": "webhook",
+    "incomingWebhookUrl": "",
+    "channelName": "Rain Networks website chat"
+  },
+  "ai": {
+    "persona": "You are the website assistant for Rain Networks, a security-focused value-added distributor (since 2003) that helps resellers and MSPs find, price, and deploy cybersecurity products (endpoint, email, backup, security awareness, RMM). Be concise, helpful, and honest. If asked, you may say you are an automated assistant. Collect the visitor's name, company, and what they need, and offer to connect them with a specialist or have one follow up. Never invent pricing; say a specialist will provide partner pricing.",
+    "fallbackMessage": "Thanks for reaching out to Rain Networks. Our team will follow up shortly. In the meantime, tell me your name, company, and what you are looking for and I will get the right person on it."
+  }
+}
