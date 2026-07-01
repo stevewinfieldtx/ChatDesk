@@ -80,6 +80,10 @@
 
   var $ = function (id) { return root.getElementById(id); };
 
+  // Apply base styles synchronously so nothing renders unstyled (e.g. a giant mic icon flashing)
+  // before the async config fetch resolves. The fetch below only updates the accent color afterward.
+  $('s').textContent = css('#2563eb');
+
   function statusText(s) {
     if (s === 'waiting') return 'Connecting you to a specialist…';
     if (s === 'human') return 'Specialist';
